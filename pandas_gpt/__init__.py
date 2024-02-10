@@ -1,4 +1,7 @@
 import pandas as pd
+import os
+
+from threading import Thread
 
 verbose = False # Override default setting with `pandas_gpt.verbose = True`
 mutable = False # Override default setting with `pandas_gpt.mutable = True`
@@ -12,14 +15,20 @@ Write a Python function `process({arg_name})` which takes the following input va
 {arg_name} = {arg}
 
 This is the function's purpose: {goal}
+This fuction's outputs MUST be exported to `{out_dir}` folder with the respective file extension. 
+Attention:
+ * If ploting, instead of showing it, you must only export it.
 '''
 
 _ask_cache = {}
 
+ROOT_PATH = os.path.dirname(os.path.realpath(__file__))
+
 class Ask:
-  def __init__(self, *, verbose=None, mutable=None):
+  def __init__(self, *, verbose=None, mutable=None, out_dir=None):
     self.verbose = verbose if verbose is not None else globals()['verbose']
     self.mutable = mutable if mutable is not None else globals()['mutable']
+    self.out_dir = out_dir if out_dir is not None else os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
   @staticmethod
   def _fill_template(template, **kw):
@@ -43,7 +52,7 @@ class Ask:
       arg_summary = repr(arg)
     arg_name = 'df' if isinstance(arg, pd.DataFrame) else 'index' if isinstance(arg, pd.Index) else 'data'
 
-    return self._fill_template(template, arg_name=arg_name, arg=arg_summary.strip(), goal=goal.strip())
+    return self._fill_template(template, arg_name=arg_name, arg=arg_summary.strip(), goal=goal.strip(), out_dir=self.out_dir)
 
   def _run_prompt(self, prompt):
     import openai
@@ -66,15 +75,19 @@ class Ask:
     if not m:
       return text
     return m.group(3)
-
+  
   def _eval(self, source, *args):
+    source = source.replace("plt.style.use('seaborn')", "plt.style.use('classic')")
     _args_ = args
     scope = dict(_args_=args)
     exec(self._fill_template('''
       {source}
       _result_ = process(*_args_)
     ''', source=source), scope)
-    return scope['_result_']
+    _result = scope['_result_']
+    print(f"[ DEBUG ] type: {type(_result)}")
+    # print(f"[ DEBUG ]  res: {_result}")
+    return _result
 
   def _code(self, goal, arg):
     prompt = self._get_prompt(goal, arg)
@@ -92,7 +105,15 @@ class Ask:
 
   def __call__(self, goal, *args):
     source = self._code(goal, *args)
-    return self._eval(source, *args)
+    # Create the thread that will start your function
+    from threading import Thread
+    eval_thread = Thread(target=self._eval, args=(source, *args))
+    # Start the thread
+    eval_thread.start()
+    # Join your thread with the execution time you want
+    eval_thread.join() #120
+    # return self._eval(source, *args)
+    return None
 
 
 @pd.api.extensions.register_dataframe_accessor('ask')
