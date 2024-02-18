@@ -6,7 +6,7 @@ from threading import Thread
 verbose = False # Override default setting with `pandas_gpt.verbose = True`
 mutable = False # Override default setting with `pandas_gpt.mutable = True`
 
-model = 'gpt-3.5-turbo'
+model = 'gpt-4-1106-preview' #'gpt-3.5-turbo'
 completion_config = {}
 
 template = '''
