@@ -9,16 +9,22 @@ mutable = False # Override default setting with `pandas_gpt.mutable = True`
 model = 'gpt-4-1106-preview' #'gpt-3.5-turbo'
 completion_config = {}
 
-template = '''
+PROMPT_TEMPLATE = {}
+
+PROMPT_TEMPLATE['system'] = '''
+Write the function in a Python code block with all necessary imports and no example usage.
+'''
+PROMPT_TEMPLATE['user'] = '''
 Write a Python function `process({arg_name})` which takes the following input value:
 
 {arg_name} = {arg}
 
-This is the function's purpose: {goal}
+This is the function goal: {goal}
 This fuction's outputs MUST be exported to `{out_dir}` folder with the respective file extension. 
 Attention:
  * If ploting, instead of showing it, you must only export it.
 '''
+
 
 _ask_cache = {}
 
@@ -52,7 +58,7 @@ class Ask:
       arg_summary = repr(arg)
     arg_name = 'df' if isinstance(arg, pd.DataFrame) else 'index' if isinstance(arg, pd.Index) else 'data'
 
-    return self._fill_template(template, arg_name=arg_name, arg=arg_summary.strip(), goal=goal.strip(), out_dir=self.out_dir)
+    return self._fill_template(PROMPT_TEMPLATE['user'], arg_name=arg_name, arg=arg_summary.strip(), goal=goal.strip(), out_dir=self.out_dir)
 
   def _run_prompt(self, prompt):
     import openai
@@ -60,7 +66,7 @@ class Ask:
     completion = cache.get(prompt) or openai.chat.completions.create(
       model=model,
       messages=[
-        dict(role='system', content='Write the function in a Python code block with all necessary imports and no example usage.'),
+        dict(role='system', content=PROMPT_TEMPLATE['system']),
         dict(role='user', content=prompt),
       ],
       **completion_config,
